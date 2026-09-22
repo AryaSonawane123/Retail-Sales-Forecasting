@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RetailSight — Sales Forecasting Dashboard</title>
+  <meta name="description" content="AI-powered retail sales forecasting dashboard with inventory risk analysis, seasonal insights, and product-level demand predictions." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <!-- ── Sidebar ── -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <div class="brand-icon">📦</div>
+      <div class="brand-text">
+        <span class="brand-name">RetailSight</span>
+        <span class="brand-sub">Forecasting AI</span>
+      </div>
+    </div>
+
+    <nav class="sidebar-nav">
+      <button class="nav-item active" data-page="overview" id="nav-overview">
+        <span class="nav-icon">🏠</span><span>Overview</span>
+      </button>
+      <button class="nav-item" data-page="forecast" id="nav-forecast">
+        <span class="nav-icon">📈</span><span>Forecast</span>
+      </button>
+      <button class="nav-item" data-page="inventory" id="nav-inventory">
+        <span class="nav-icon">🔔</span><span>Inventory Alerts</span>
+        <span class="nav-badge" id="alert-badge">0</span>
+      </button>
+      <button class="nav-item" data-page="insights" id="nav-insights">
+        <span class="nav-icon">💡</span><span>Insights</span>
+      </button>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="run-status" id="run-status">
+        <span class="status-dot pulsing"></span>
+        <span class="status-text">Model Active</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ── Main Content ── -->
+  <main class="main-content">
+
+    <!-- ══ PAGE: OVERVIEW ══ -->
+    <section class="page active" id="page-overview">
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">Sales Forecasting Overview</h1>
+          <p class="page-sub">XGBoost + SARIMA Ensemble · Test Period Evaluation</p>
+        </div>
+        <div class="header-actions">
+          <button class="btn-secondary" id="run-pipeline-btn">▶ Run Pipeline</button>
+          <button class="btn-primary"   id="load-demo-btn">Load Demo Data</button>
+        </div>
+      </div>
+
+      <!-- KPI Cards -->
+      <div class="kpi-grid" id="kpi-grid">
+        <div class="kpi-card">
+          <div class="kpi-icon accent-green">🎯</div>
+          <div class="kpi-body">
+            <span class="kpi-label">Forecast Accuracy</span>
+            <span class="kpi-value" id="kpi-accuracy">—</span>
+            <span class="kpi-delta positive" id="kpi-accuracy-target">Target: ≥ 90%</span>
+          </div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-icon accent-blue">📉</div>
+          <div class="kpi-body">
+            <span class="kpi-label">Overall MAPE</span>
+            <span class="kpi-value" id="kpi-mape">—</span>
+            <span class="kpi-delta" id="kpi-mape-sub">Mean Abs % Error</span>
+          </div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-icon accent-purple">📐</div>
+          <div class="kpi-body">
+            <span class="kpi-label">RMSE</span>
+            <span class="kpi-value" id="kpi-rmse">—</span>
+            <span class="kpi-delta">Root Mean Sq Error</span>
+          </div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-icon accent-orange">⚡</div>
+          <div class="kpi-body">
+            <span class="kpi-label">Products Tracked</span>
+            <span class="kpi-value" id="kpi-products">—</span>
+            <span class="kpi-delta">Categories</span>
+          </div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-icon accent-red">🚨</div>
+          <div class="kpi-body">
+            <span class="kpi-label">High-Risk Items</span>
+            <span class="kpi-value" id="kpi-highrisk">—</span>
+            <span class="kpi-delta">Stockout / Overstock</span>
+          </div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-icon accent-teal">📊</div>
+          <div class="kpi-body">
+            <span class="kpi-label">R² Score</span>
+            <span class="kpi-value" id="kpi-r2">—</span>
+            <span class="kpi-delta">Coefficient of Det.</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Charts Row -->
+      <div class="charts-row">
+        <div class="chart-card wide">
+          <div class="chart-card-header">
+            <h3>Forecast vs Actual — All Products</h3>
+            <div class="legend-pills">
+              <span class="pill blue">● Actual</span>
+              <span class="pill green">● Ensemble</span>
+            </div>
+          </div>
+          <div class="chart-wrap"><canvas id="chart-overview-ts"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-card-header"><h3>Per-Product Accuracy (%)</h3></div>
+          <div class="chart-wrap"><canvas id="chart-accuracy-bar"></canvas></div>
+        </div>
+      </div>
+
+      <!-- Per-Product Metrics Table -->
+      <div class="table-card">
+        <div class="table-header">
+          <h3>Model Performance by Product</h3>
+          <input class="table-search" id="metrics-search" placeholder="🔍 Filter products…" />
+        </div>
+        <div class="table-wrap">
+          <table id="metrics-table">
+            <thead>
+              <tr>
+                <th>Product</th>
+                <th>Accuracy (%)</th>
+                <th>MAPE (%)</th>
+                <th>RMSE</th>
+                <th>MAE</th>
+                <th>R²</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="metrics-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══ PAGE: FORECAST ══ -->
+    <section class="page" id="page-forecast">
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">Product Forecast Explorer</h1>
+          <p class="page-sub">Interactive drill-down into per-product predictions</p>
+        </div>
+      </div>
+
+      <div class="forecast-controls">
+        <div class="control-group">
+          <label>Product</label>
+          <select id="forecast-product-select"></select>
+        </div>
+        <div class="control-group">
+          <label>View</label>
+          <select id="forecast-view-select">
+            <option value="all">All Models</option>
+            <option value="ensemble">Ensemble Only</option>
+            <option value="xgb">XGBoost Only</option>
+            <option value="sarima">SARIMA Only</option>
+          </select>
+        </div>
+        <div class="control-group">
+          <label>Granularity</label>
+          <select id="forecast-granularity">
+            <option value="daily">Daily</option>
+            <option value="weekly">Weekly Avg</option>
+            <option value="monthly">Monthly Avg</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="charts-row">
+        <div class="chart-card wide">
+          <div class="chart-card-header">
+            <h3 id="forecast-chart-title">Product Forecast</h3>
+            <div class="legend-pills" id="forecast-legend"></div>
+          </div>
+          <div class="chart-wrap tall"><canvas id="chart-forecast-ts"></canvas></div>
+        </div>
+      </div>
+
+      <div class="charts-row">
+        <div class="chart-card">
+          <div class="chart-card-header"><h3>Monthly Demand Trend</h3></div>
+          <div class="chart-wrap"><canvas id="chart-monthly-trend"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-card-header"><h3>Day-of-Week Pattern</h3></div>
+          <div class="chart-wrap"><canvas id="chart-dow"></canvas></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══ PAGE: INVENTORY ALERTS ══ -->
+    <section class="page" id="page-inventory">
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">Inventory Risk Alerts</h1>
+          <p class="page-sub">Stockout & overstock risk with safety stock recommendations</p>
+        </div>
+      </div>
+
+      <div class="kpi-grid small" id="inv-kpi-grid">
+        <div class="kpi-card">
+          <div class="kpi-icon accent-red">📉</div>
+          <div class="kpi-body">
+            <span class="kpi-label">High Stockout Risk</span>
+            <span class="kpi-value" id="inv-high-stockout">—</span>
+          </div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-icon accent-orange">📦</div>
+          <div class="kpi-body">
+            <span class="kpi-label">High Overstock Risk</span>
+            <span class="kpi-value" id="inv-high-overstock">—</span>
+          </div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-icon accent-green">✅</div>
+          <div class="kpi-body">
+            <span class="kpi-label">Low Risk Products</span>
+            <span class="kpi-value" id="inv-low-risk">—</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="charts-row">
+        <div class="chart-card">
+          <div class="chart-card-header"><h3>Stockout Risk by Product</h3></div>
+          <div class="chart-wrap"><canvas id="chart-stockout"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-card-header"><h3>Overstock Risk by Product</h3></div>
+          <div class="chart-wrap"><canvas id="chart-overstock"></canvas></div>
+        </div>
+      </div>
+
+      <div class="table-card">
+        <div class="table-header"><h3>Inventory Risk Table</h3></div>
+        <div class="table-wrap">
+          <table id="risk-table">
+            <thead>
+              <tr>
+                <th>Product</th>
+                <th>Avg Daily Sales</th>
+                <th>Avg Forecast</th>
+                <th>Forecast Bias</th>
+                <th>Safety Stock</th>
+                <th>Reorder Point</th>
+                <th>Stockout Risk</th>
+                <th>Overstock Risk</th>
+                <th>Risk Level</th>
+              </tr>
+            </thead>
+            <tbody id="risk-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Recommendations -->
+      <div class="recs-section">
+        <h3 class="section-heading">💡 Actionable Recommendations</h3>
+        <div id="recs-container" class="recs-grid"></div>
+      </div>
+    </section>
+
+    <!-- ══ PAGE: INSIGHTS ══ -->
+    <section class="page" id="page-insights">
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">Business Insights</h1>
+          <p class="page-sub">Seasonality, promotions, and feature importance analysis</p>
+        </div>
+      </div>
+
+      <div class="charts-row">
+        <div class="chart-card wide">
+          <div class="chart-card-header"><h3>Seasonal Demand Heatmap</h3></div>
+          <div class="heatmap-wrap" id="heatmap-container"></div>
+        </div>
+      </div>
+
+      <div class="charts-row">
+        <div class="chart-card">
+          <div class="chart-card-header"><h3>Promotional Sales Lift (%)</h3></div>
+          <div class="chart-wrap"><canvas id="chart-promo-lift"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-card-header"><h3>Top Feature Importances (XGBoost)</h3></div>
+          <div class="chart-wrap"><canvas id="chart-feat-imp"></canvas></div>
+        </div>
+      </div>
+
+      <div class="insight-cards" id="insight-cards-grid"></div>
+    </section>
+
+  </main>
+
+  <!-- ── Loading Overlay ── -->
+  <div class="loading-overlay" id="loading-overlay">
+    <div class="loader-box">
+      <div class="loader-spinner"></div>
+      <p class="loader-text" id="loader-text">Loading insights…</p>
+    </div>
+  </div>
+
+  <script src="insights_data.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
